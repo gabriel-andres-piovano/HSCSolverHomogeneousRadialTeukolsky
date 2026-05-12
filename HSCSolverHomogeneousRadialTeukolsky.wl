@@ -4,7 +4,7 @@
 (*Begin package*)
 
 
-BeginPackage["HSCSolverHomogeneuosRadialTeukolsky`"];
+BeginPackage["HSCSolverHomogeneousRadialTeukolsky`"];
 
 
 TsolverInres::usage = "TsolverInres[s,l,m,a,\[Omega],\[Lambda],r1g] gives the rescaled In solution and its first-order derivative of the homogeneous radial Teukolsky equation. r1g is the outermost integration radius.";
@@ -22,10 +22,10 @@ TsolverUp::usage = "TsolverUp[s,l,m,a,\[Omega],\[Lambda],r2g] gives the Up solut
 TsolverUpNearHorizon::usage = "TsolverUpNearHorizon[s,l,m,a,\[Omega],\[Lambda],{\[Psi]up,d\[Psi]up}] provides the boundary condition near the horizon for the Up solution of the Teukolsky equation."
 
 
-TsolverIn1spin::usage = "TsolverIn[s,l,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1,{\[Psi]in0,d\[Psi]in0},r1g] gives the derivative wrt the frequency of the In solution and its first-order derivative of the homogeneous radial Teukolsky equation. r1g is the outermost integration radius.";
+TsolverIn1spin::usage = "TsolverIn[s,l,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1,r1g] gives the derivative wrt the frequency of the In solution and its first-order derivative of the homogeneous radial Teukolsky equation. r1g is the outermost integration radius.";
 
 
-TsolverUp1spin::usage = "TsolverUp[s,l,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1,{\[Psi]up0,d\[Psi]up0},r2g] gives the derivative wrt the frequency of the Up solution and its first-order derivative of the homogeneous radial Teukolsky equation. r2g is the innermost integration radius.";
+TsolverUp1spin::usage = "TsolverUp[s,l,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1,r2g] gives the derivative wrt the frequency of the Up solution and its first-order derivative of the homogeneous radial Teukolsky equation. r2g is the innermost integration radius.";
 
 
 Begin["`Private`"];
@@ -119,7 +119,7 @@ bchormin[workingprecision_,s_,m_,a_,\[Omega]_,\[Lambda]_]:=Module[{M=1,deltarp,A
 			phor=p[rin,-1,s,m,a,\[Omega],\[Lambda]];
 			qhor=q[rin,-1,s,m,a,\[Omega],\[Lambda]];
 		];
-        a2n[i]=Chop[A2n[i],10^(-workingprecision)];
+        a2n[i]=A2n[i];
 		\[Psi]hor=Evaluate[1+Sum[a2n[k](#-rp)^k,{k,i}]]&;
 		err=Abs[\[Psi]hor''[rin]+phor*\[Psi]hor'[rin]+qhor*\[Psi]hor[rin]];
 
@@ -241,7 +241,7 @@ bchorplus[workingprecision_,s_,m_,a_,\[Omega]_,\[Lambda]_]:=Module[{M=1,\[Kappa]
 			phor=phorfun[rin];
 			qhor=qhorfun[rin];
 		];
-        a2n[i]=Chop[A2n[i],10^(-workingprecision)];
+        a2n[i]=A2n[i];
 		\[Psi]hor=Evaluate[1+Sum[a2n[k](#-rp)^k,{k,i}]]&;
 		err=Abs[\[Psi]hor''[rin]+phor*\[Psi]hor'[rin]+qhor*\[Psi]hor[rin]];
 
@@ -326,15 +326,18 @@ bcinfmin[workingprecision_,s_,m_,a_,\[Omega]_,\[Lambda]_]:=Module[{M=1,B1n,rp,rm
 (*In solution rescaled*)
 
 
-TsolverInres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rp,rm,p,q,cInH,\[Psi]hor,eqhor,r,rtor,X,Y,\[Psi]in,d\[Psi]in,nmaxhor},
+TsolverInres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{workODE,precBC,precGoal,accGoal,rin,rp,rm,p,q,cInH,\[Psi]hor,eqhor,r,rtor,X,Y,\[Psi]in,d\[Psi]in,nmaxhor},
 	rp=1+Sqrt[1-a^2];
 	rm=1-Sqrt[1-a^2];
-
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision)||(Precision[r1g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]],Precision[r1g]}];
 	];
 
@@ -350,12 +353,12 @@ TsolverInres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,
 			X[rin]==\[Psi]hor[rin],Y[rin]== \[Psi]hor'[rin]
 		};
 
-	{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+	{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
 	(* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
 	{Function[{r},Evaluate[If[r<=rin,Evaluate[\[Psi]hor[r]],Evaluate[\[Psi]in[r]]]],Listable],Function[{r},Evaluate[If[r<=rin,Evaluate[\[Psi]hor'[r]],Evaluate[d\[Psi]in[r]]]],Listable],rin}
@@ -366,12 +369,16 @@ TsolverInres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,
 (*Up solution rescaled*)
 
 
-TsolverUpres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rout,p,q,cOutinf,\[Psi]inf,eqinf,r,X,Y,\[Psi]up,d\[Psi]up,nmaxinf},
+TsolverUpres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{workODE,precBC,precGoal,accGoal,rout,p,q,cOutinf,\[Psi]inf,eqinf,r,X,Y,\[Psi]up,d\[Psi]up,nmaxinf},
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision)||(Precision[r2g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]],Precision[r2g]}];
 	];
 
@@ -387,12 +394,12 @@ TsolverUpres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rout
 			X[rout]==\[Psi]inf[rout],Y[rout]==\[Psi]inf'[rout]
 		};  
 
-	{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+	{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
 	(* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
 	{Function[{r},Evaluate[If[r>=rout,Evaluate[\[Psi]inf[r]],Evaluate[\[Psi]up[r]]]],Listable],Function[{r},Evaluate[If[r>=rout,Evaluate[\[Psi]inf'[r]],Evaluate[d\[Psi]up[r]]]],Listable],rout}
@@ -403,7 +410,7 @@ TsolverUpres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rout
 (*In solution*)
 
 
-TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rout,routplus,routmin,rp,rm,resfac,dfacexp,p,q,cInH,\[Psi]hor,cOutinfplus,cOutinfmin,nmaxinfplus,nmaxinfmin,eqhor,r,rtor,\[Alpha],X,Y,\[Psi]in,d\[Psi]in,nmaxhor,\[Psi]infplus,\[Psi]infmin,Bref,Binc,Rinfplus,dRinfplus,Rinfmin,dRinfmin,Rin,dRin,B1,B2},
+TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{workODE,precBC,precGoal,accGoal,rin,rout,routplus,routmin,rp,rm,resfac,dfacexp,p,q,cInH,\[Psi]hor,cOutinfplus,cOutinfmin,nmaxinfplus,nmaxinfmin,eqhor,r,rtor,\[Alpha],X,Y,\[Psi]in,d\[Psi]in,nmaxhor,\[Psi]infplus,\[Psi]infmin,Bref,Binc,Rinfplus,dRinfplus,Rinfmin,dRinfmin,Rin,dRin,B1,B2},
 	rp=1+Sqrt[1-a^2];
 	rm=1-Sqrt[1-a^2];
 	rtor=Evaluate[(2rp)/(rp-rm) Log[(#-rp)/2]-(2rm)/(rp-rm) Log[(#-rm)/2]+#]&;
@@ -412,10 +419,14 @@ TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rou
 	dfacexp=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]+a m)];
 
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision)||(Precision[r1g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]],Precision[r1g]}];
 	];
 
@@ -446,7 +457,7 @@ TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rou
 		};
 
 	If[r1g>=rout,
-		{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,rout},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+		{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,rout},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
 		{Bref,Binc}={B1,B2}/.NSolve[B1*Rinfplus[rout]+B2*Rinfmin[rout]==(\[Alpha]*resfac[-1,rout]\[Psi]in[rout])&&B1*dRinfplus[rout]+B2*dRinfmin[rout]==(\[Alpha]*resfac[-1,rout](dfacexp[-1,rout]\[Psi]in[rout]+d\[Psi]in[rout])),{B1,B2}][[1]];
 
@@ -461,15 +472,15 @@ TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rou
 										Evaluate[{Bref,Binc} . {dRinfplus[r],dRinfmin[r]}]
 									]],Listable];
 		,
-		{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+		{\[Psi]in,d\[Psi]in}={X,Y}/.First@NDSolve[eqhor,{X,Y},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
 		Rin=Function[{r},Evaluate[If[r<=rin,Evaluate[\[Alpha]*resfac[-1,r]\[Psi]hor[r]],Evaluate[\[Alpha] resfac[-1,r]\[Psi]in[r]]]],Listable];
 		dRin=Function[{r},Evaluate[If[r<=rin,Evaluate[\[Alpha]*resfac[-1,r](dfacexp[-1,r]\[Psi]hor[r]+\[Psi]hor'[r])],Evaluate[\[Alpha]*resfac[-1,r](dfacexp[-1,r]\[Psi]in[r]+d\[Psi]in[r])]]],Listable];
 	];
 	(* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
 	{Rin,dRin,{rin,rout}}
@@ -480,7 +491,7 @@ TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_]:=Module[{precODE,precBC,rin,rou
 (*Up solution*)
 
 
-TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rin,rout,rinplus,rinmin,rp,rm,\[Kappa],\[CapitalOmega]H,resfac,dfacexp,p,q,\[Psi]inf,cOutinf,nmaxinf,eqinf,r,rtor,\[Alpha],X,Y,\[Psi]up,d\[Psi]up,cInHplus,cInHmin,nmaxhorplus,nmaxhormin,\[Psi]horplus,\[Psi]hormin,Cref,Cinc,Rhorplus,dRhorplus,Rhormin,dRhormin,Rup,dRup,C1,C2},
+TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{workODE,precBC,precGoal,accGoal,rin,rout,rinplus,rinmin,rp,rm,\[Kappa],\[CapitalOmega]H,resfac,dfacexp,p,q,\[Psi]inf,cOutinf,nmaxinf,eqinf,r,rtor,\[Alpha],X,Y,\[Psi]up,d\[Psi]up,cInHplus,cInHmin,nmaxhorplus,nmaxhormin,\[Psi]horplus,\[Psi]hormin,Cref,Cinc,Rhorplus,dRhorplus,Rhormin,dRhormin,Rup,dRup,C1,C2},
 	rp=1+Sqrt[1-a^2];
 	rm=1-Sqrt[1-a^2];
 	\[Kappa]=\[Omega]-m*\[CapitalOmega]H;
@@ -491,10 +502,14 @@ TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rin,rou
 	dfacexp=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]+a m)];
 
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision)||(Precision[r2g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]],Precision[r2g]}];
 	];
 
@@ -524,31 +539,36 @@ TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rin,rou
 			X[rout]==\[Psi]inf[rout],Y[rout]== \[Psi]inf'[rout]
 		};
 
-	If[r2g<=rin,
-		{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,rin,rout},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
-
-		{Cinc,Cref}={C1,C2}/.NSolve[C1*Rhorplus[rin]+C2*Rhormin[rin]==(resfac[1,rin]\[Psi]up[rin])&&C1*dRhorplus[rin]+C2 dRhormin[rin]==(resfac[1,rin](dfacexp[1,rin]\[Psi]up[rin]+d\[Psi]up[rin])),{C1,C2}][[1]];
-
-		Rup=Function[{r},Evaluate[If[r>=rin,
-							Evaluate[If[r<=rout,Evaluate[resfac[1,r]\[Psi]up[r]],Evaluate[resfac[1,r]\[Psi]inf[r]]]]
-							,
-							Evaluate[{Cinc,Cref} . {Rhorplus[r],Rhormin[r]}]
-						]],Listable];
-		dRup=Function[{r},Evaluate[If[r>=rin,
-							Evaluate[If[r<=rout,Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]up[r]+d\[Psi]up[r])],Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]inf[r]+\[Psi]inf'[r])]]]
-							,
-							Evaluate[{Cinc,Cref} . {dRhorplus[r],dRhormin[r]}]
-						]],Listable];
+	If[r2g>=rout,
+		Rup=Function[{r},Evaluate[resfac[1,r]\[Psi]inf[r]],Listable];
+		dRup=Function[{r},Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]inf[r]+\[Psi]inf'[r])],Listable];
 		,
-		{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+		If[r2g<=rin,
+			{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,rin,rout},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
-		Rup=Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r]\[Psi]inf[r]],Evaluate[resfac[1,r]\[Psi]up[r]]]],Listable];
-		dRup=Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]inf[r]+\[Psi]inf'[r])],Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]up[r]+d\[Psi]up[r])]]],Listable];
+			{Cinc,Cref}={C1,C2}/.NSolve[C1*Rhorplus[rin]+C2*Rhormin[rin]==(resfac[1,rin]\[Psi]up[rin])&&C1*dRhorplus[rin]+C2 dRhormin[rin]==(resfac[1,rin](dfacexp[1,rin]\[Psi]up[rin]+d\[Psi]up[rin])),{C1,C2}][[1]];
+
+			Rup=Function[{r},Evaluate[If[r>=rin,
+								Evaluate[If[r<=rout,Evaluate[resfac[1,r]\[Psi]up[r]],Evaluate[resfac[1,r]\[Psi]inf[r]]]]
+								,
+								Evaluate[{Cinc,Cref} . {Rhorplus[r],Rhormin[r]}]
+							]],Listable];
+			dRup=Function[{r},Evaluate[If[r>=rin,
+								Evaluate[If[r<=rout,Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]up[r]+d\[Psi]up[r])],Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]inf[r]+\[Psi]inf'[r])]]]
+								,
+								Evaluate[{Cinc,Cref} . {dRhorplus[r],dRhormin[r]}]
+							]],Listable];
+			,
+			{\[Psi]up,d\[Psi]up}={X,Y}/.First@NDSolve[eqinf,{X,Y},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
+
+			Rup=Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r]\[Psi]inf[r]],Evaluate[resfac[1,r]\[Psi]up[r]]]],Listable];
+			dRup=Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]inf[r]+\[Psi]inf'[r])],Evaluate[resfac[1,r](dfacexp[1,r]\[Psi]up[r]+d\[Psi]up[r])]]],Listable];
+		]
 	];
 	(* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
 	{Rup,dRup,{rin,rout}}
@@ -559,7 +579,7 @@ TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_]:=Module[{precODE,precBC,rin,rou
 (*Up solution near the horizon*)
 
 
-TsolverUpNearHorizon[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,{\[Psi]up_,d\[Psi]up_}]:=Module[{precODE,precBC,rin,rout,rinplus,rinmin,rp,rm,\[Kappa],\[CapitalOmega]H,resfac,dfacexp,\[Psi]inf,cOutinf,nmaxinf,eqinf,r,rtor,\[Alpha],X,Y,cInHplus,cInHmin,nmaxhorplus,nmaxhormin,\[Psi]horplus,\[Psi]hormin,Cref,Cinc,Rhorplus,dRhorplus,Rhormin,dRhormin,C1,C2},
+TsolverUpNearHorizon[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,{\[Psi]up_,d\[Psi]up_}]:=Module[{precBC,rin,rout,rinplus,rinmin,rp,rm,\[Kappa],\[CapitalOmega]H,resfac,dfacexp,\[Psi]inf,cOutinf,nmaxinf,eqinf,r,rtor,\[Alpha],X,Y,cInHplus,cInHmin,nmaxhorplus,nmaxhormin,\[Psi]horplus,\[Psi]hormin,Cref,Cinc,Rhorplus,dRhorplus,Rhormin,dRhormin,C1,C2},
 	rp=1+Sqrt[1-a^2];
 	rm=1-Sqrt[1-a^2];
 	\[Kappa]=\[Omega]-m*\[CapitalOmega]H;
@@ -570,10 +590,8 @@ TsolverUpNearHorizon[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,{\[Psi]up_,d\[Psi]up_}]:=M
 	dfacexp=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]+a m)];
 
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5}];
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]]}];
 	];
 
@@ -788,21 +806,25 @@ bcinfplus1spin[workingprecision_,s_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[La
 (*In solution*)
 
 
-TsolverIn1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,{\[Psi]in0_,d\[Psi]in0_},r1g_]:=Module[{precODE,precBC,r,rin,rtor,rp,rm,resfac,dfacexp0,dfacexp1,p0,p1,q0,q1,cInH0,cInH1,\[Psi]hor0,\[Psi]hor1,eqhor,\[Alpha],X1,Y1,\[Psi]in1,d\[Psi]in1,nmaxhor},
-	rp=1+Sqrt[1^2-a^2];
-	rm=1-Sqrt[1^2-a^2];
+TsolverIn1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,r1g_]:=Module[{workODE,precBC,precGoal,accGoal,r,rin,rtor,rp,rm,resfac,dfacexp0,dfacexp1,p0,p1,q0,q1,cInH0,cInH1,\[Psi]hor0,\[Psi]hor1,eqhor,\[Alpha],X0,Y0,X1,Y1,\[Psi]in0,d\[Psi]in0,\[Psi]in1,d\[Psi]in1,nmaxhor},
+	rp = 1+Sqrt[1^2-a^2];
+	rm = 1-Sqrt[1^2-a^2];
 	rtor=Evaluate[(2rp)/(rp-rm) Log[(#-rp)/2]-(2rm)/(rp-rm) Log[(#-rm)/2]+#]&;
 	\[Alpha]=rp*Exp[I*a*m(1/2+1/rp Log[(rp-rm)/2])];
-	resfac=Evaluate[Function[{H,r},1/r(r^2-2r+a^2)^(-s)Exp[H*I*\[Omega]0*rtor[r]]Exp[I*m*a/(rp-rm) (Log[(r-rp)/(r-rm)])]]];
-	dfacexp0=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]0+a m)];
+	resfac=Evaluate[Function[{H,r},1/r*(r^2-2r+a^2)^(-s)Exp[H*I*\[Omega]0*rtor[r]]Exp[I*m*a/(rp-rm)(Log[(r-rp)/(r-rm)])]]];
+	dfacexp0=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H*(r^2+a^2)\[Omega]0+a m)];
 	dfacexp1=Function[{H,r},I*H*\[Omega]1((r^2+a^2)/(r^2-2r+a^2)+rtor[r] dfacexp0[H,r])];
 
-	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]0]==MachinePrecision)||(Precision[\[Omega]1]==MachinePrecision)||(Precision[\[Lambda]0]==MachinePrecision)||(Precision[\[Lambda]1]==MachinePrecision)||(Precision[r1g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]0]==MachinePrecision)||(Precision[\[Lambda]0]==MachinePrecision)||(Precision[\[Omega]1]==MachinePrecision)||(Precision[\[Lambda]1]==MachinePrecision)||(Precision[r1g]==MachinePrecision),
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]0]-5,Precision[\[Lambda]1]-5,Precision[r1g]-5}];
-		precBC=Min[{Precision[a],Precision[\[Omega]0],Precision[\[Omega]1],Precision[\[Lambda]0],Precision[\[Lambda]1],Precision[r1g]}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Lambda]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]1]-5,Precision[r1g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
+		precBC=Min[{Precision[a],Precision[\[Omega]0],Precision[\[Lambda]0],Precision[\[Omega]1],Precision[\[Lambda]1],Precision[r1g]}];
 	];
 
 	{p0,q0}=TeukolskyHSCoefficients;
@@ -815,29 +837,35 @@ TsolverIn1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,{\[Psi]
 	\[Psi]hor1=Evaluate[Sum[cInH1[[i]](#-rp)^(i-1),{i,nmaxhor}]]&;
 
 	eqhor={
-		X1'[r] == Y1[r],
-		Y1'[r] == -(p0[r,-1,s,m,a,\[Omega]0,\[Lambda]0]Y1[r]+q0[r,-1,s,m,a,\[Omega]0,\[Lambda]0] X1[r])-(p1[r,-1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1]d\[Psi]in0[r]+q1[r,-1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] \[Psi]in0[r]),
-		X1[rin] == \[Psi]hor1[rin],Y1[rin] == \[Psi]hor1'[rin]
-		};
+		X0'[r] == Y0[r],
+		Y0'[r] == -p0[r,-1,s,m,a,\[Omega]0,\[Lambda]0]Y0[r]-q0[r,-1,s,m,a,\[Omega]0,\[Lambda]0] X0[r],
+		X1'[r] == Y1[r],Y1'[r] == -(p0[r,-1,s,m,a,\[Omega]0,\[Lambda]0]Y1[r]+q0[r,-1,s,m,a,\[Omega]0,\[Lambda]0] X1[r])-(p1[r,-1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1]Y0[r]+q1[r,-1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] X0[r]),
+		X0[rin] == \[Psi]hor0[rin],Y0[rin] == \[Psi]hor0'[rin],X1[rin] == \[Psi]hor1[rin],Y1[rin] == \[Psi]hor1'[rin]
+	};
 
-	{\[Psi]in1,d\[Psi]in1} = {X1,Y1}/.First@NDSolve[eqhor,{X1,Y1},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+	{\[Psi]in0,d\[Psi]in0,\[Psi]in1,d\[Psi]in1} = {X0,Y0,X1,Y1}/.First@NDSolve[eqhor,{X0,Y0,X1,Y1},{r,rin,r1g},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
 
 	(* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X1$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y1$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X0$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y0$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X1$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y1$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
-	{Function[{r},Evaluate[
+	{Function[{r},Evaluate[If[r<=rin,Evaluate[\[Alpha]*resfac[-1,r]\[Psi]hor0[r]],Evaluate[\[Alpha]*resfac[-1,r]\[Psi]in0[r]]]],Listable],
+	Function[{r},Evaluate[If[r<=rin,Evaluate[\[Alpha]*resfac[-1,r](dfacexp0[-1,r]\[Psi]hor0[r]+\[Psi]hor0'[r])],Evaluate[\[Alpha]*resfac[-1,r](dfacexp0[-1,r]\[Psi]in0[r]+d\[Psi]in0[r])]]],Listable],
+	Function[{r},Evaluate[
 						If[r<=rin,
-								Evaluate[\[Alpha]*resfac[-1,r](\[Psi]hor1[r]-I*rtor[r]*\[Omega]1*\[Psi]hor0[r])],
-								Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r]-I*rtor[r]*\[Omega]1*\[Psi]in0[r])]]
+							Evaluate[\[Alpha]*resfac[-1,r](\[Psi]hor1[r]-I*rtor[r]*\[Omega]1*\[Psi]hor0[r])],
+							Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r]-I*rtor[r]*\[Omega]1*\[Psi]in0[r])]]
 						],Listable],
 	Function[{r},Evaluate[
 						If[r<=rin,
-								Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r] dfacexp0[-1,r]+\[Psi]in0[r] dfacexp1[-1,r]+d\[Psi]in1[r]-I*rtor[r]*\[Omega]1*d\[Psi]in0[r])],
-								Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r] dfacexp0[-1,r]+\[Psi]in0[r] dfacexp1[-1,r]+d\[Psi]in1[r]-I*rtor[r]*\[Omega]1*d\[Psi]in0[r])]]
-						],Listable],rin}
+							Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r] dfacexp0[-1,r]+\[Psi]in0[r] dfacexp1[-1,r]+d\[Psi]in1[r]-I*rtor[r]*\[Omega]1*d\[Psi]in0[r])],
+							Evaluate[\[Alpha]*resfac[-1,r](\[Psi]in1[r] dfacexp0[-1,r]+\[Psi]in0[r] dfacexp1[-1,r]+d\[Psi]in1[r]-I*rtor[r]*\[Omega]1*d\[Psi]in0[r])]]
+						],Listable]
+	,rin}
 ]
 
 
@@ -845,54 +873,66 @@ TsolverIn1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,{\[Psi]
 (*Up solution*)
 
 
-TsolverUp1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,{\[Psi]up0_,d\[Psi]up0_},r2g_]:=Module[{precODE,precBC,r,rout,rtor,rp,rm,resfac,dfacexp0,dfacexp1,p0,p1,q0,q1,cOutinf0,cOutinf1,\[Psi]inf0,\[Psi]inf1,eqinf,\[Alpha],X1,Y1,\[Psi]up1,d\[Psi]up1,nmaxinf},
-	rp=1+Sqrt[1^2-a^2];
-	rm=1-Sqrt[1^2-a^2];
+TsolverUp1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,r2g_]:=Module[{workODE,precBC,precGoal,accGoal,r,rout,rtor,rp,rm,resfac,dfacexp0,dfacexp1,p0,p1,q0,q1,cOutinf0,cOutinf1,\[Psi]inf0,\[Psi]inf1,eqinf,\[Alpha],X0,Y0,X1,Y1,\[Psi]up0,d\[Psi]up0,\[Psi]up1,d\[Psi]up1,nmaxinf},
+	rp = 1+Sqrt[1^2-a^2];
+	rm = 1-Sqrt[1^2-a^2];
 	rtor=Evaluate[(2rp)/(rp-rm) Log[(#-rp)/2]-(2rm)/(rp-rm) Log[(#-rm)/2]+#]&;
 	\[Alpha]=rp*Exp[I*a*m(1/2+1/rp Log[(rp-rm)/2])];
-	resfac=Evaluate[Function[{H,r},1/r (r^2-2r+a^2)^(-s)Exp[H I \[Omega]0 rtor[r]]Exp[I m a/(rp-rm) (Log[(r-rp)/(r-rm)])]]];
-	dfacexp0=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]0+a m)];
+	resfac=Evaluate[Function[{H,r},1/r*(r^2-2r+a^2)^(-s)Exp[H*I*\[Omega]0*rtor[r]]Exp[I*m*a/(rp-rm)(Log[(r-rp)/(r-rm)])]]];
+	dfacexp0=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H*(r^2+a^2)\[Omega]0+a m)];
 	dfacexp1=Function[{H,r},I*H*\[Omega]1((r^2+a^2)/(r^2-2r+a^2)+rtor[r] dfacexp0[H,r])];
 
-	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]0]==MachinePrecision)||(Precision[\[Omega]1]==MachinePrecision)||(Precision[\[Lambda]0]==MachinePrecision)||(Precision[\[Lambda]1]==MachinePrecision)||(Precision[r2g]==MachinePrecision),
-		precODE=MachinePrecision;
-		precBC=precODE;
+	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]0]==MachinePrecision)||(Precision[\[Lambda]0]==MachinePrecision)||(Precision[\[Omega]1]==MachinePrecision)||(Precision[\[Lambda]1]==MachinePrecision)||(Precision[r2g]==MachinePrecision),
+		workODE=MachinePrecision;
+		precGoal=13;
+		accGoal=13;
+		precBC=15;
 		,
-		precODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]0]-5,Precision[\[Lambda]1]-5,Precision[r2g]-5}];
-		precBC=Min[{Precision[a],Precision[\[Omega]0],Precision[\[Omega]1],Precision[\[Lambda]0],Precision[\[Lambda]1],Precision[r2g]}];
+		workODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Lambda]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]1]-5,Precision[r2g]-5}];
+		precGoal=workODE-5;
+		accGoal=workODE-5;
+		precBC=Min[{Precision[a],Precision[\[Omega]0],Precision[\[Lambda]0],Precision[\[Omega]1],Precision[\[Lambda]1],Precision[r2g]}];
 	];
+
 
 	{p0,q0}=TeukolskyHSCoefficients;
 	{p1,q1}=TeukolskyHSCoefficients1spin;
 
 	{cOutinf0,cOutinf1,rout}=bcinfplus1spin[precBC,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1];
-	nmaxinf=Length[cOutinf0];
+	nmaxinf = Length[cOutinf0];
 	\[Psi]inf0=Evaluate[Sum[cOutinf0[[i]]#^(-i+1),{i,nmaxinf}]]&;
 	\[Psi]inf1=Evaluate[Sum[cOutinf1[[i]]#^(-i+1),{i,nmaxinf}]]&;
 
 	eqinf={
+		X0'[r] == Y0[r],
+		Y0'[r] == -p0[r,1,s,m,a,\[Omega]0,\[Lambda]0]Y0[r]-q0[r,1,s,m,a,\[Omega]0,\[Lambda]0] X0[r],
 		X1'[r] == Y1[r],
-		Y1'[r] == -(p0[r,1,s,m,a,\[Omega]0,\[Lambda]0] Y1[r]+q0[r,1,s,m,a,\[Omega]0,\[Lambda]0] X1[r])-(p1[r,1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] d\[Psi]up0[r]+q1[r,1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] \[Psi]up0[r]),
-		X1[rout] == \[Psi]inf1[rout],Y1[rout] == \[Psi]inf1'[rout]
+		Y1'[r] == -(p0[r,1,s,m,a,\[Omega]0,\[Lambda]0] Y1[r]+q0[r,1,s,m,a,\[Omega]0,\[Lambda]0] X1[r])-(p1[r,1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] Y0[r]+q1[r,1,s,m,a,\[Omega]0,\[Omega]1,\[Lambda]0,\[Lambda]1] X0[r]),
+		X0[rout] == \[Psi]inf0[rout],Y0[rout] == \[Psi]inf0'[rout],X1[rout] == \[Psi]inf1[rout],Y1[rout] == \[Psi]inf1'[rout]
 		};
-	{\[Psi]up1,d\[Psi]up1} = {X1,Y1}/.First@NDSolve[eqinf,{X1,Y1},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->precODE,InterpolationOrder->All];
+	{\[Psi]up0,d\[Psi]up0,\[Psi]up1,d\[Psi]up1} = {X0,Y0,X1,Y1}/.First@NDSolve[eqinf,{X0,Y0,X1,Y1},{r,r2g,rout},Method->"StiffnessSwitching",WorkingPrecision->workODE,PrecisionGoal->precGoal,AccuracyGoal->accGoal,InterpolationOrder->All];
   
    (* Remove local variables not garbage collected*)
 	ClearSystemCache[];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`X1$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
-	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneuosRadialTeukolsky`Private`Y1$"~~__]&/@Names["HSCSolverHomogeneuosRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X0$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y0$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`X1$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
+	Remove[Evaluate[ToExpression[Pick[Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],StringMatchQ[#,"HSCSolverHomogeneousRadialTeukolsky`Private`Y1$"~~__]&/@Names["HSCSolverHomogeneousRadialTeukolsky`Private`*"],True]]]];
 	Remove[r];
 
-	{Function[{r},Evaluate[
+	{Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r]\[Psi]inf0[r]],Evaluate[resfac[1,r]\[Psi]up0[r]] ]],Listable],
+	Function[{r},Evaluate[If[r>rout,Evaluate[resfac[1,r](dfacexp0[1,r]\[Psi]inf0[r]+\[Psi]inf0'[r])],Evaluate[resfac[1,r](dfacexp0[1,r]\[Psi]up0[r]+d\[Psi]up0[r])]]],Listable],
+	Function[{r},Evaluate[
 						If[r>=rout,
-								Evaluate[resfac[1,r](\[Psi]inf1[r]+I*rtor[r]*\[Omega]1*\[Psi]inf0[r])],
-								Evaluate[resfac[1,r](\[Psi]up1[r]+I*rtor[r]*\[Omega]1 *\[Psi]up0[r])]]
+							Evaluate[resfac[1,r](\[Psi]inf1[r]+I*rtor[r]*\[Omega]1*\[Psi]inf0[r])],
+							Evaluate[resfac[1,r](\[Psi]up1[r]+I*rtor[r]*\[Omega]1*\[Psi]up0[r])]]
 						],Listable],
 	Function[{r},Evaluate[
 						If[r>=rout,
-								Evaluate[resfac[1,r](\[Psi]inf1[r] dfacexp0[1,r]+\[Psi]inf0[r] dfacexp1[1,r]+\[Psi]inf1'[r]+I*rtor[r]*\[Omega]1*\[Psi]inf0'[r])],
-								Evaluate[resfac[1,r](\[Psi]up1[r] dfacexp0[1,r]+\[Psi]up0[r] dfacexp1[1,r]+d\[Psi]up1[r]+I*rtor[r]*\[Omega]1*d\[Psi]up0[r])]]
-						],Listable],rout}
+							Evaluate[resfac[1,r](\[Psi]inf1[r] dfacexp0[1,r]+\[Psi]inf0[r] dfacexp1[1,r]+\[Psi]inf1'[r]+I*rtor[r]*\[Omega]1*\[Psi]inf0'[r])],
+							Evaluate[resfac[1,r](\[Psi]up1[r] dfacexp0[1,r]+\[Psi]up0[r] dfacexp1[1,r]+d\[Psi]up1[r]+I*rtor[r]*\[Omega]1*d\[Psi]up0[r])]]
+						],Listable]
+	,rout}
 ]
 
 
