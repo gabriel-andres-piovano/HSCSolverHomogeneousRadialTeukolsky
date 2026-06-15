@@ -333,7 +333,7 @@ TsolverInres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_,intorder_]:=Module[{workODE,p
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
 		precGoal=workODE-5;
@@ -374,7 +374,7 @@ TsolverUpres[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_,intorder_]:=Module[{workODE,p
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
 		precGoal=workODE-5;
@@ -422,7 +422,7 @@ TsolverIn[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r1g_,intorder_]:=Module[{workODE,prec
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r1g]-5}];
 		precGoal=workODE-5;
@@ -505,7 +505,7 @@ TsolverUp[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,r2g_,intorder_]:=Module[{workODE,prec
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]]-5,Precision[\[Lambda]]-5,Precision[r2g]-5}];
 		precGoal=workODE-5;
@@ -590,7 +590,7 @@ TsolverUpNearHorizon[s_,l_,m_,a_,\[Omega]_,\[Lambda]_,{\[Psi]up_,d\[Psi]up_}]:=M
 	dfacexp=Function[{H,r},-(1/r +(2s(r-1))/(r^2-2r+a^2))+I/(r^2-2r+a^2) (H(r^2+a^2)\[Omega]+a m)];
 
 	If[(Precision[a]==MachinePrecision)||(Precision[\[Omega]]==MachinePrecision)||(Precision[\[Lambda]]==MachinePrecision),
-		precBC=15;
+		precBC=13;
 		,
 		precBC=Min[{Precision[a],Precision[\[Omega]],Precision[\[Lambda]]}];
 	];
@@ -819,7 +819,7 @@ TsolverIn1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,r1g_,in
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Lambda]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]1]-5,Precision[r1g]-5}];
 		precGoal=workODE-5;
@@ -886,7 +886,7 @@ TsolverUp1spin[s_,l_,m_,a_,\[Omega]0_,\[Omega]1_,\[Lambda]0_,\[Lambda]1_,r2g_,in
 		workODE=MachinePrecision;
 		precGoal=13;
 		accGoal=13;
-		precBC=15;
+		precBC=13;
 		,
 		workODE=Min[{Precision[a]-5,Precision[\[Omega]0]-5,Precision[\[Lambda]0]-5,Precision[\[Omega]1]-5,Precision[\[Lambda]1]-5,Precision[r2g]-5}];
 		precGoal=workODE-5;
