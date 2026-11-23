@@ -1,4 +1,7 @@
 # HSCSolverHomogeneousRadialTeukolsky
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24467988.svg)](https://doi.org/10.5281/zenodo.24467988)
+
 Code for the computation of the homogeneous solutions of the radial Teukolsky equation. The package includes an integrator that numerically solves the RWZ equation transformed into Hyperboloidal Slicing coordinates. All boundary conditions for the $`R^\text{in}`$ and $`R^\text{up}`$ solutions are implemented. The solver automatically switches to the asymptotic solutions near horizon or $\infty$ for both $`R^\text{in}`$ and $`R^\text{up}`$.
 
 
